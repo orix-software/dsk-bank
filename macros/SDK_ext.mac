@@ -1,0 +1,24 @@
+.delmacro fseek
+
+.macro fseek fp, offset, whence
+		lda	#CH376_BYTE_LOCATE
+		sta	CH376_COMMAND
+
+		lda	offset
+		; lda	#$00
+		sta	CH376_DATA
+
+		lda	offset+1
+		sta	CH376_DATA
+
+		lda	offset+2
+		sta	CH376_DATA
+
+		lda	offset+3
+		; lda	#$00
+		sta	CH376_DATA
+
+		jsr	WaitResponse
+		cmp	#CH376_USB_INT_SUCCESS
+.endmacro
+

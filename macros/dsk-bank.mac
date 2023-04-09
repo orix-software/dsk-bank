@@ -1,0 +1,31 @@
+
+.macro savezp
+		; Sauvegarde le contenu de zptr (pour sedsd)
+		; 14 cycles
+		; /!\ Doit conserver A
+		;pha
+
+		ldy	zptr			; [3]
+		sty	zptr_save		; [4]
+		ldy	zptr+1			; [3]
+		sty	zptr_save+1		; [4]
+
+		;pla
+.endmacro
+
+.macro restorezp
+		; Restaure le contenu de zptr (pour sedsd)
+		; 14 cycles
+		ldy	zptr_save		; [4]
+		sty	zptr			; [3]
+		ldy	zptr_save+1		; [4]
+		sty	zptr+1			; [3]
+.endmacro
+
+;.import __ZP_LAST__, __ZP_START__
+;		ldx	#(__ZP_LAST__ - __ZP_START__ -1)	; [2]
+;	@loop:
+;		lda	__ZP_START__,x		; [4]
+;		sta	zptr_save,x		; [5]
+;		dey				; [2]
+;		bne	@loop			; [2/3]

@@ -1,0 +1,185 @@
+
+;----------------------------------------------------------------------
+; Number of commands
+;----------------------------------------------------------------------
+.scope SDK_ROM
+	command_nb .set 0
+	vectors_set .set 0
+.endscope
+
+;----------------------------------------------------------------------
+;
+; usage:
+;       add_command "command_name"[, command_address]
+;
+; note:
+;       command_address defaults to command_name
+;       Ex: add_command "test" will use label test  for command_address
+;
+; Add command_name to the rom
+;----------------------------------------------------------------------
+.macro add_command command_name, address
+
+	verbose 2, .sprintf("*** Add command: %s", command_name)
+
+	.assert SDK_ROM::vectors_set = 0, ldwarning, .sprintf("Command '%s' defined after set_orix_vectors", command_name)
+
+	.pushseg
+
+		.segment "INSTRTBL"
+			.ident(.sprintf("%s_name",command_name)) := *
+			.asciiz command_name
+
+		.segment "INSTRTBL2"
+			.word .ident(.sprintf("%s_name",command_name))
+
+		.if .not .xmatch({address}, NOOP)
+			.segment "INSTRJMP"
+
+				.if .not .blank({address})
+					.addr address
+				.else
+					.word .ident(command_name)
+				.endif
+		.endif
+
+		SDK_ROM::command_nb .set SDK_ROM::command_nb+1
+
+	.popseg
+.endmacro
+
+
+;----------------------------------------------------------------------
+;
+; usage:
+;	command "command_name"
+;
+; note:
+;	Open command scope, don't forget to use endcommand to close
+;	the scope
+;
+; Add command_name to the rom
+;----------------------------------------------------------------------
+.macro command command_name
+
+	verbose 2, .sprintf("*** Add command: %s", command_name)
+
+	.assert SDK_ROM::vectors_set = 0, ldwarning, .sprintf("Command '%s' defined after set_orix_vectors", command_name)
+
+	.pushseg
+
+		.segment "INSTRTBL"
+			.ident(.sprintf("%s_name",command_name)) := *
+			.asciiz command_name
+
+		.segment "INSTRTBL2"
+			.word .ident(.sprintf("%s_name",command_name))
+
+		.segment "INSTRJMP"
+			.word .ident(command_name)
+
+
+		SDK_ROM::command_nb .set SDK_ROM::command_nb+1
+
+	.popseg
+
+	.proc .ident(command_name)
+.endmacro
+
+
+;----------------------------------------------------------------------
+;
+; usage:
+;       endcommand
+;
+; Close command scope
+;----------------------------------------------------------------------
+.macro endcommand
+	.endproc
+.endmacro
+
+
+;----------------------------------------------------------------------
+;
+; usage:
+;       set_orix_vectors rom_type, parse_vector, signature
+;
+; note:
+;       signature: may be "string" or label
+;       if signature is a "string", this macro create new label rom_signaure
+;
+; Set orix rom vectors
+;----------------------------------------------------------------------
+.macro set_orix_vectors rom_type, parse_vector, signature
+	.local _signature
+
+	.pushseg
+
+		.import __INSTRJMP_LOAD__
+		.import __INSTRTBL_LOAD__
+
+		.if .match(signature,"")
+			.segment "SIGNATURE"
+				.import __SIGNATURE_LOAD__
+
+				; A voir si dans ce cas on doit définir le label "rom_signature" ou non
+				; .ident(.sprintf("rom_signature")) := *
+
+				_signature := __SIGNATURE_LOAD__
+				.asciiz signature
+		.else
+			_signature := signature
+		.endif
+
+		.segment "ORIXVECT"
+			.byte rom_type
+			.addr parse_vector
+			.addr __INSTRJMP_LOAD__
+			.addr __INSTRTBL_LOAD__
+			.byte SDK_ROM::command_nb
+			.word  _signature
+
+	.popseg
+
+	SDK_ROM::vectors_set .set 1
+
+	verbose 1, .sprintf("*** Bank name: %s", signature)
+	verbose 1, .sprintf("*** Commands : %d", SDK_ROM::command_nb)
+
+	.assert SDK_ROM::command_nb > 0, warning, "No command defined"
+
+.endmacro
+
+
+;----------------------------------------------------------------------
+;
+; usage:
+;       set_cpu_vectors nmi, reset, irq
+;
+; Set 6502 vectors
+;----------------------------------------------------------------------
+.macro set_cpu_vectors nmi, reset, irq
+	.pushseg
+
+	.segment "CPUVECT"
+	.addr nmi
+	.addr reset
+	.addr irq
+
+	.popseg
+.endmacro
+
+; ----------------------------------------------------------------------------
+; verbose level, string
+; ----------------------------------------------------------------------------
+;       Affiche un message si level <= VERBOSE_LEVEL
+; ----------------------------------------------------------------------------
+.macro verbose level, string
+	.ifdef VERBOSE_LEVEL
+		.if level <= ::VERBOSE_LEVEL
+			.out string
+		.endif
+	.endif
+.endmacro
+
+
