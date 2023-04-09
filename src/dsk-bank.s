@@ -91,8 +91,10 @@ CAN_USE_KERNEL = 0
 TRACK_SIZE = 6400
 MAX_SECTORS = 20
 
+NEED_SECTOR_INFOS = 0
+
 WHOLE_TRACK = 1
-DEBUG =1
+; DEBUG = 1
 CACHE_DIR = 1
 
 ;----------------------------------------------------------------------
@@ -578,8 +580,10 @@ CACHE_DIR = 1
 ;		restorezp			; [14]
 
 		; [ debug
+	.ifdef DEBUG
 		ldy	#' '			; [2]
 		sty	$bb80+5			; [4]
+	.endif
 		; ]
 
 		; Retour au sedoric
@@ -634,36 +638,36 @@ CACHE_DIR = 1
 ;
 ; Variables:
 ;	Modifiées:
-;		- dskname
+;		dskname
 ;	Utilisées:
-;		- zptr
+;		-
 ; Sous-routines:
-;	-
+;	bank_init
 ;
 ;----------------------------------------------------------------------
 .proc set_dskname
-		savezp				; [14]
-
-		sta	zptr			; [3]
-		stx	zptr+1			; [3]
+		sta	ld_b0+1			; [4]
+		stx	ld_b0+2			; [4]
+		sta	st_bn+1			; [4]
+		stx	st_bn+2			; [4]
 
 		jsr	bank_init		; [6]
 
 		; Si nomm de fichier nul -> end
 		ldy	#$00			; [2]
-		lda	(zptr),y		; [5+]
+	ld_b0:
+		lda	$ffff			; [4]
 		beq	end			; [2/3]
 
 		dey				; [2]
 	loop:
 		iny				; [2]
-		lda	(zptr),y		; [5+]
+	st_bn:
+		lda	$ffff,y			; [4+]
 		sta	dskname,y		; [5]
 		bne	loop			; [2/3]
 
 	end:
-		restorezp			; [14]
-
 		rts				; [6]
 .endproc
 
@@ -1599,6 +1603,8 @@ CACHE_DIR = 1
 			cmp	#$fe			; [2]
 			bne	loop2			; [2/3]
 
+
+		.if ::NEED_SECTOR_INFOS
 			; Track
 			; ldy	#$00
 			lda	(zptr),y		; [5+]
@@ -1625,7 +1631,20 @@ CACHE_DIR = 1
 			lda	(zptr),y		; [5+]
 
 			iny				; [2]
+		.else
+			; Track
+			iny				; [2]
+			; Head
+			iny				; [2]
+			; Sector
+			lda	(zptr),y		; [5+]
+			tax				; [2]
 
+			tya				; [2]
+			; Ici C=1 à cause du cmp #$fe
+			adc	#($04-1)		; [2]
+			tay				; [2]
+		.endif
 			; GAP 3
 			; On suppose que le format de la piste est correct et qu'on va
 			; bien trouver un $FB, sinon il faut vérifier que zptr ne
