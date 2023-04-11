@@ -773,7 +773,7 @@ CACHE_DIR = 1
 	.endif
 
 		; Initialise le numéro de secteur courant
-		sta	fdc_sectr		; [4]
+		sta	fdc_sector		; [4]
 
 		; Initialise le numéro de piste courant
 		lda	#$ff			; [2]
