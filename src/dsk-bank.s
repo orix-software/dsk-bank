@@ -469,7 +469,7 @@ CACHE_DIR = 1
 ;		ldx	#>dskname2
 ;		jsr	set_dskname
 
-		sec				; [2]toto:
+		sec				; [2]
 	.if ::CAN_USE_KERNEL
 		ldx	#<dskname		; [2]
 		ldy	#>dskname		; [2]
@@ -668,6 +668,18 @@ CACHE_DIR = 1
 		bne	loop			; [2/3]
 
 	end:
+
+		; Si on veut faire la Vérification du fichier et la lecture
+		; de la piste 20 maintenant plutôt que de la différer lors
+		; de la première lecture d'une piste
+		; C=0 -> ftdos, C=1 -> sedoric
+;		sec
+;	.if ::CAN_USE_KERNEL
+;		ldx	#<dskname		; [2]
+;		ldy	#>dskname		; [2]
+;	.endif
+;		jsr	mount			; [6]
+
 		rts				; [6]
 .endproc
 
@@ -759,6 +771,9 @@ CACHE_DIR = 1
 		; Compteur d'accès à la piste 20
 		sta	track20_count
 	.endif
+
+		; Initialise le numéro de secteur courant
+		sta	fdc_sectr		; [4]
 
 		; Initialise le numéro de piste courant
 		lda	#$ff			; [2]
@@ -926,7 +941,7 @@ CACHE_DIR = 1
 			ldx	#$14			; [2]
 			ldy	#$01			; [2]
 			jsr	read_track		; [6]
-			bne	errTrack		; [2/3]
+			bcs	errTrack		; [2/3]
 
 			lda	#$ff			; [2]
 			sta	fdc_sector		; [4]
@@ -1441,12 +1456,12 @@ CACHE_DIR = 1
 			jsr	SetByteRead		; [6]
 			bcs	end_error		; [2/3]
 
-			; Initialise la table des secteurs
+			; Initialise la table des secteurs (poids forts uniquement)
 			lda	#$00			; [2]
-			ldy	#(MAX_SECTORS<<1)	; [2]
+			ldy	#MAX_SECTORS		; [2]
 
 		loop_init:
-			sta	sectors_tbl,y		; [5]
+			sta	sectors_tbl+MAX_SECTORS,y	; [5]
 			dey				; [2]
 			bpl	loop_init		; [2/3]
 
