@@ -10,6 +10,7 @@
 ;----------------------------------------------------------------------
 .include "SDK.mac"
 .include "types.mac"
+.include "case.mac"
 
 ;----------------------------------------------------------------------
 ;			include application
@@ -63,11 +64,22 @@
 ;----------------------------------------------------------------------
 CAN_USE_KERNEL = 0
 
+.enum
+	error_read = 1
+	error_mount
+	error_track
+	error_fmt
+	error_open
+	error_readusb
+	error_rdgo
+.endenum
+
 ;----------------------------------------------------------------------
 ;				Page zéro
 ;----------------------------------------------------------------------
 .pushseg
 	.segment "ZEROPAGE"
+		unsigned char errFlag
 ;		unsigned short zptr
 ;		;unsigned short fp
 .popseg
@@ -79,7 +91,6 @@ CAN_USE_KERNEL = 0
 	.segment "DATA"
 
 	.segment "BSS"
-
 .popseg
 
 ;----------------------------------------------------------------------
@@ -96,10 +107,10 @@ CAN_USE_KERNEL = 0
 	;----------------------------------------------------------------------
 	; Liste des commandes
 	;----------------------------------------------------------------------
-		add_command "mount2", cmnd_mount
-		add_command "seek", cmnd_seek
-		add_command "read", cmnd_read
-		add_command "umount", cmnd_umount
+		add_command "dsk", cmnd_mount
+		; add_command "seek", cmnd_seek
+		; add_command "read", cmnd_read
+		add_command "eject", cmnd_umount
 
 	;----------------------------------------------------------------------
 	; Vecteurs Orix: rom_type, parse_vector, rom_signature
@@ -144,9 +155,12 @@ CAN_USE_KERNEL = 0
 ;----------------------------------------------------------------------
 .proc cmnd_mount
 		clc
-		adc	#.strlen("mount2")
+		adc	#.strlen("dsk")
 		jsr	get_param
-		beq	end_noparam
+		; beq	end_noparam
+		bne	suite
+		jmp	end_noparam
+	suite:
 
 		tya
 		clc
@@ -156,19 +170,54 @@ CAN_USE_KERNEL = 0
 		adc	#$00
 		sta	zptr+1
 
-		ldy	#$ff
-	loop:
-		iny
+		ldy	#$00
 		lda	(zptr),y
-		sta	dskname,y
+		cmp	#'/'
+		beq	absolute_path
+
+		getcwd
+		sta	path+1
+		sty	path+2
+
+		ldx	#$ff
+	loop:
+		inx
+	path:
+		lda	$fff,x
+		sta	dskname,x
+		bne	loop
+
+		dex
+		beq	relative_path
+
+		; Ajoute le '/' final
+		inx
+		lda	#'/'
+		sta	dskname,x
+
+		jmp	relative_path
+
+
+	absolute_path:
+		ldx	#$ff
+
+	relative_path:
+		ldy	#$ff
+
+	absolute_loop:
+		iny
+		inx
+		lda	(zptr),y
+		sta	dskname,x
 		beq	end
 		cmp	#' '
-		bne	loop
+		bne	absolute_loop
 	end:
 		lda	#$00
 		sta	(zptr),y
-		sta	dskname,y
+		sta	dskname,x
 
+.if 0
 		; C=0: ftdos
 		sec
 		ldx	zptr
@@ -202,7 +251,59 @@ CAN_USE_KERNEL = 0
 		rts
 
 	end_noparam:
+		print	dskname
+		crlf
 		rts
+
+.else
+		lda	#$00
+		sta	errFlag
+
+		; Initialise la banque
+		jsr	bank_init
+
+		; Monte le disque
+		; C=0 => FTDOS
+		; C=1 => Sedoric
+		sec
+		jsr	mount
+		beq	exit
+
+	errOpen:
+		sta	errFlag
+		do_case
+			case_of error_mount
+				prints	"File not found: "
+
+			case_of error_fmt
+				prints	"Bad file format: "
+
+			case_of error_track
+				prints	"Track 20 not found: "
+
+			case_of error_open
+				prints	"Open error: "
+			case_of error_readusb
+				prints	"ReadUSBData error: "
+			case_of	error_rdgo
+				prints	"ByteRdGo error: "
+		end_case
+
+	end_noparam:
+		print	dskname
+		crlf
+
+		lda	errFlag
+		beq	exit
+
+		ldy	#$00
+		sty	dskname
+
+	exit:
+		ldx	#$00
+		rts
+.endif
+
 .endproc
 
 ;----------------------------------------------------------------------
@@ -275,7 +376,7 @@ CAN_USE_KERNEL = 0
 ;----------------------------------------------------------------------
 .proc cmnd_umount
 		clc
-		adc	#.strlen("umount")
+		adc	#.strlen("eject")
 		jsr	get_param
 		bne	end_error
 

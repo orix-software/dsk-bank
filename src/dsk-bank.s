@@ -86,6 +86,9 @@ CAN_USE_KERNEL = 0
 	error_mount
 	error_track
 	error_fmt
+	error_open
+	error_readusb
+	error_rdgo
 .endenum
 
 TRACK_SIZE = 6400
@@ -113,7 +116,7 @@ CACHE_DIR = 1
 	.segment "DATA"
 		unsigned short fp
 		dskname:
-			.asciiz "/USR/SHARE/SEDORIC/S/SEDORIC3.DSK"
+			.asciiz "/usr/share/sedoric/s/sedoric3.dsk"
 			.res	50-(*-dskname),0
 ;		unsigned char dsk_name[80]
 
@@ -891,7 +894,7 @@ CACHE_DIR = 1
 
 			jsr	open			; [6]
 			cmp	#CH376_USB_INT_SUCCESS	; [2]
-			bne	error			; [2/3]
+			bne	errOpen			; [2/3]
 ;			jsr	SetFilename		; [6]
 ;			jsr	FileOpen		; [6]
 ;			bcs	error			; [2/3]
@@ -901,7 +904,7 @@ CACHE_DIR = 1
 			jsr	SetByteRead		; [6]
 
 			jsr	ReadUSBData		; [6]
-			beq	error			; [2/3]
+			beq	errRead			; [2/3]
 
 			tay				; [2]
 			ldx	#$00			; [2]
@@ -914,7 +917,7 @@ CACHE_DIR = 1
 
 			jsr	ByteRdGo		; [6]
 			cmp	#CH376_USB_INT_SUCCESS	; [2]
-			bne	error			; [2/3]
+			bne	errRdGo			; [2/3]
 		.endif
 
 			; [ vérification de l'entête du fichier
@@ -977,9 +980,18 @@ CACHE_DIR = 1
 			lda	#$00			; [2]
 			rts				; [6]
 
-		error:
-			lda	#error_mount		; [2]
+		errOpen:
+			; lda	#error_mount		; [2]
+			lda	#error_open
 			rts				; [6]
+
+		errRead:
+			lda	#error_readusb
+			rts
+
+		errRdGo:
+			lda	#error_rdgo
+			rts
 
 		errFormat:
 			lda	#error_fmt		; [2]
@@ -1010,6 +1022,11 @@ CACHE_DIR = 1
 .proc umount
 		; Initialise la banque
 		jsr	bank_init		; [6]
+
+		; Efface le nom du fichier .dsk
+		lda	#$00			; [2]
+		sta	dskname			; [4]
+
 		rts				; [6]
 .endproc
 
