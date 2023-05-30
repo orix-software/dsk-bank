@@ -14,12 +14,12 @@ on:
 jobs:
   # This workflow contains a single job called "build"
   setup-sdk:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Cache sdk
         id: cache-sdk
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
              cc65/**/*
@@ -37,14 +37,14 @@ jobs:
 
       - name: Checkout orix-sdk
         if: steps.cache-sdk.outputs.cache-hit != 'true'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: assinie/orix-sdk
           path: orix-sdk
 
       - name: Checkout md2hlp
         if: steps.cache-sdk.outputs.cache-hit != 'true'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: assinie/md2hlp
           path: md2hlp
@@ -83,7 +83,7 @@ jobs:
   build:
     # The type of runner that the job will run on
     needs: setup-sdk
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.job_vars.outputs.VERSION }}
       repo_name: ${{ steps.job_vars.outputs.REPO_NAME }}
@@ -98,7 +98,7 @@ jobs:
           echo "::set-output name=REPO_NAME::${GITHUB_REPOSITORY##*/}"
 
       - name: Install sdk
-        uses: actions/cache@v2
+        uses: actions/cache@v3
         with:
           path: |
              cc65/**/*
@@ -129,7 +129,7 @@ jobs:
 
   upload:
     needs: build
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-22.04
     defaults:
       run:
         shell: bash
@@ -155,7 +155,7 @@ jobs:
       # On pourrait faire l'extraction directement à la racine si VERSION est dans l'artifact
       - name: Download Artifact
         id: download
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: ${{ needs.build.outputs.repo_name }}
           path: artifact
