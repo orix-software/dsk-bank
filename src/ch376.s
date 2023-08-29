@@ -14,6 +14,7 @@
 ;----------------------------------------------------------------------
 .include "SDK.mac"
 .include "types.mac"
+.include "case.mac"
 .include "ch376.inc"
 
 
@@ -30,6 +31,9 @@
 ; From main
 .importzp zptr
 
+; From dsk-cli.s
+.import prhexa
+
 ;----------------------------------------------------------------------
 ;				exports
 ;----------------------------------------------------------------------
@@ -41,10 +45,12 @@
 .export ByteRdGo
 .export ByteLocate
 
+.export ch376_debug
+
 ;----------------------------------------------------------------------
 ;			Defines / Constantes
 ;----------------------------------------------------------------------
-
+DEBUG_CH376 = 1
 ;----------------------------------------------------------------------
 ;				Page zéro
 ;----------------------------------------------------------------------
@@ -58,7 +64,21 @@
 ;----------------------------------------------------------------------
 .pushseg
 	.segment "DATA"
+	.segment "BSS"
 
+		.if DEBUG_CH376
+			unsigned char lastcmd
+
+			unsigned char errFileOpen
+			unsigned char errFileClose
+			unsigned char errSetByteRead
+			unsigned char errByteRdGo
+			unsigned char errByteLocate
+
+			unsigned char WaitResponseX
+			unsigned char WaitResponseY
+			unsigned char WaitResponseOVF
+		.endif
 .popseg
 
 ;----------------------------------------------------------------------
@@ -96,6 +116,10 @@
 		lda	#CH376_SET_FILENAME	; [2]
 		sta	CH376_COMMAND		; [4]
 
+	.if ::DEBUG_CH376
+		sta	lastcmd
+	.endif
+
 		ldy	#$ff			; [2]
 	loop:
 		iny				; [2]
@@ -124,7 +148,14 @@
 .proc FileOpen
 		lda	#CH376_FILE_OPEN	; [2]
 		sta	CH376_COMMAND		; [4]
+	.if ::DEBUG_CH376
+		sta	lastcmd
+		jsr	WaitResponse		; [3]
+		sta	errFileOpen
+		rts
+	.else
 		jmp	WaitResponse		; [3]
+	.endif
 .endproc
 
 ;----------------------------------------------------------------------
@@ -147,10 +178,16 @@
 		pha				; [3]
 		lda	#CH376_FILE_CLOSE	; [2]
 		sta	CH376_COMMAND		; [4]
+	.if ::DEBUG_CH376
+		sta	lastcmd
+	.endif
 		pla				; [4]
 		sta	CH376_DATA		; [4]
 		jsr	WaitResponse		; [6]
 		cmp	#CH376_USB_INT_SUCCESS	; [2]
+	.if ::DEBUG_CH376
+		sta	errFileClose		; [4]
+	.endif
 		rts				; [6]
 .endproc
 
@@ -179,12 +216,19 @@
 		lda	#CH376_BYTE_READ	; [2]
 		sta	CH376_COMMAND		; |4]
 
+	.if ::DEBUG_CH376
+		sta	lastcmd
+	.endif
+
 		pla				; [4]
 		sta	CH376_DATA		; [4]
 		sty	CH376_DATA		; [4]
 		jsr	WaitResponse		; [6]
 
 		cmp	#CH376_USB_INT_DISK_READ	; [2]
+	.if ::DEBUG_CH376
+		sta	errSetByteRead		; [4]
+	.endif
 		bne	error			; [2/3]
 		clc				; [2]
 		rts				; [6]
@@ -216,6 +260,11 @@
 .proc ReadUSBData
 		lda	#CH376_RD_USB_DATA0	; [2]
 		sta	CH376_COMMAND		; [4]
+
+	.if ::DEBUG_CH376
+		sta	lastcmd
+	.endif
+
 		lda	CH376_DATA		; [4]
 
 		rts				; [6]
@@ -241,8 +290,17 @@
 .proc ByteRdGo
                 lda     #CH376_BYTE_RD_GO	; [2]
                 sta     CH376_COMMAND		; [4]
+
+	.if ::DEBUG_CH376
+		sta	lastcmd
+	.endif
+
                 jsr     WaitResponse		; [6]
                 cmp     #CH376_USB_INT_DISK_READ	; [2]
+
+	.if ::DEBUG_CH376
+		sta	errByteRdGo		; [4]
+	.endif
                 rts				; [6]
 .endproc
 
@@ -269,6 +327,10 @@
 		lda	#CH376_BYTE_LOCATE	; [2]
 		sta	CH376_COMMAND		; [4]
 
+	.if ::DEBUG_CH376
+		sta	lastcmd
+	.endif
+
 		lda	fpos			; [4]
 		sta	CH376_DATA		; [4]
 
@@ -283,6 +345,10 @@
 
 		jsr	WaitResponse		; [6]
 		cmp	#CH376_USB_INT_SUCCESS	; [2]
+
+	.if ::DEBUG_CH376
+		sta	errByteLocate		; [4]
+	.endif
 
 		rts				; [6]
 .endproc
@@ -300,22 +366,113 @@
 ; 25 Octets
 ;---------------------------------------------------------------------------
 .proc WaitResponse
-		ldy     #$ff			; [2]
+	.if ::DEBUG_CH376
+		lda	#$00
+		sta	WaitResponseOVF
+	.endif
+
+		ldy     #$00			; [2]
         ZZZ009:
-		ldx     #$ff			; [2]
+		ldx     #$00			; [2]
 	ZZZ010:
 		lda     CH376_COMMAND		; [4]
 		bmi     ZZZ011			; [2/3]
 		lda     #CH376_GET_STATUS	; [2]
 		sta     CH376_COMMAND		; [4]
 		lda     CH376_DATA		; [4]
+	.if ::DEBUG_CH376
+		stx	WaitResponseX		; [4]
+		sty	WaitResponseY		; [4]
+	.endif
 		rts				; [6]
 
 	ZZZ011:
-		dex				; [2]
+		inx				; [2]
 		bne     ZZZ010			; [2/3]
-		dey				; [2]
+		iny				; [2]
 		bne     ZZZ009			; [2/3]
+	.if ::DEBUG_CH376
+		php
+		pha
+		lda	#$ff
+		sta	WaitResponseOVF
+		stx	WaitResponseX		; [4]
+		sty	WaitResponseY		; [4]
+		pla
+		plp
+	.endif
 		rts				; [6]
+.endproc
+
+;----------------------------------------------------------------------
+; Entrée:
+;	-
+;
+; Sortie:
+;	-
+;
+; Variables:
+;	Modifiées:
+;		-
+;	Utilisées:
+;		-
+; Sous-routines:
+;	-
+;
+;----------------------------------------------------------------------
+.proc ch376_debug
+		prints	"--------------------"
+		crlf
+
+		prints	"last command: "
+
+		do_case	lastcmd
+			; case_of	CH376_SET_FILENAME
+			case_of	CH376_FILE_OPEN
+				prints	"FileOpen"
+				lda	errFileOpen
+
+			case_of	CH376_FILE_CLOSE
+				prints	"FileClose"
+				lda	errFileClose
+
+			case_of	CH376_BYTE_READ
+				prints	"SetByteRead"
+				lda	errSetByteRead
+
+			case_of	CH376_RD_USB_DATA0
+				prints	"RdUsbData0"
+				lda	#$00
+
+			case_of	CH376_BYTE_RD_GO
+				prints	"ByteRdGo"
+				lda	errByteRdGo
+
+			case_of	CH376_BYTE_LOCATE
+				prints	"ByteLocate"
+				lda	errByteLocate
+
+			otherwise
+				prints "???"
+				lda	lastcmd
+		end_case
+
+		pha
+		crlf
+		prints	"last status : $"
+		pla
+		jsr	prhexa
+		crlf
+
+		prints	"WaitResponse: X=$"
+		lda	WaitResponseX
+		jsr	prhexa
+		prints	", Y=$"
+		lda	WaitResponseY
+		jsr	prhexa
+		prints	", Ovf= $"
+		lda	WaitResponseOVF
+		jsr	prhexa
+		rts
 .endproc
 

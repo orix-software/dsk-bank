@@ -48,6 +48,19 @@
 ;.import SetFilename
 .import FileClose
 
+; Pour cmnd_debug
+; From fdc.s
+.import fdc_track
+.import fdc_sector
+; From dsk-bank.s
+.import buf_track
+.import buf_track20
+.import byte_offset
+.import save_track
+.import save_sector
+; From ch376.s
+.import ch376_debug
+
 ;----------------------------------------------------------------------
 ;				exports
 ;----------------------------------------------------------------------
@@ -58,6 +71,9 @@
 
 ; Pour ch376.s, si on ne peut pas faire appel au kernel
 ;.exportzp zptr
+
+; Pour ch376.s (debug)
+.export prhexa
 
 ;----------------------------------------------------------------------
 ;			Defines / Constantes
@@ -111,6 +127,7 @@ CAN_USE_KERNEL = 0
 		; add_command "seek", cmnd_seek
 		; add_command "read", cmnd_read
 		add_command "eject", cmnd_umount
+		add_command "dskinfo", cmnd_debug
 
 	;----------------------------------------------------------------------
 	; Vecteurs Orix: rom_type, parse_vector, rom_signature
@@ -388,6 +405,113 @@ CAN_USE_KERNEL = 0
 	end_error:
 		; Paramètre indiqué alors qu'il n'en faut pas
 		jmp	umount
+.endproc
+
+;----------------------------------------------------------------------
+; Entrée:
+;	- AY: adresse de la ligne de commande (A=LSB)
+;
+; Sortie:
+;	-
+;
+; Variables:
+;	Modifiées:
+;		-
+;	Utilisées:
+;		-
+; Sous-routines:
+;	-
+;
+;----------------------------------------------------------------------
+.proc cmnd_debug
+;		clc
+;		adc	#.strlen("dskinfo")
+;		jsr	get_param
+;		bne	end_noparam
+
+
+		prints	"dskname     : "
+		print	dskname
+		crlf
+		crlf
+
+		prints	"fdc_track   : $"
+		lda	fdc_track
+		jsr	prhexa
+		crlf
+
+		prints	"fdc_sector  : $"
+		lda	fdc_sector
+		jsr	prhexa
+		crlf
+
+		prints	"byte_offset : $"
+		lda	byte_offset
+		jsr	prhexa
+		crlf
+		crlf
+
+		prints	"save_track  : $"
+		lda	save_track
+		jsr	prhexa
+		crlf
+
+		prints	"save_sector : $"
+		lda	save_sector
+		jsr	prhexa
+		crlf
+		crlf
+
+		prints	"buf_track   : $"
+		lda	#>buf_track
+		jsr	prhexa
+		lda	#<buf_track
+		jsr	prhexa
+		crlf
+
+		prints	"buf_track20 : $"
+		lda	#>buf_track20
+		jsr	prhexa
+		lda	#<buf_track20
+		jsr	prhexa
+		crlf
+
+		jsr	ch376_debug
+		crlf
+	end_noparam:
+		rts
+.endproc
+
+.proc prhexa
+	hnout1:
+		;cmp	#10
+		;bcc	nibout
+
+	hexout1:
+		pha				; [3]
+
+		; High nibble
+		lsr				; [2]
+		lsr				; [2]
+		lsr				; [2]
+		lsr				; [2]
+		jsr	nibout			; [6]
+
+		; Low nibble
+		pla				; [4]
+		and	#$0f			; [2]
+
+	nibout:
+		ora	#$30			; [2]
+		cmp	#$3a			; [2]
+		bcc	nibo1			; [2/3]
+		adc	#$06			; [2]
+
+	nibo1:
+		; sta	$bb80,y			; [5]
+		; iny				; [2]
+		cputc
+		rts				; [6]
 .endproc
 
 ;----------------------------------------------------------------------

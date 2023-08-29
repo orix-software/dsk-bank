@@ -56,7 +56,8 @@
 ;----------------------------------------------------------------------
 ;				exports
 ;----------------------------------------------------------------------
-.export __ZP_CART__:abs = VARLNG
+; .export __ZP_CART__:abs = VARLNG
+.export __ZPSTART__:abs = VARLNG
 
 .export dsk_side1_offset
 .export fpos
@@ -70,6 +71,13 @@
 .export mount
 .export umount
 .export read_track
+
+; Pour dsk-cli (debug)
+.export buf_track
+.export buf_track20
+.export byte_offset
+.export save_track
+.export save_sector
 
 ;----------------------------------------------------------------------
 ;			Defines / Constantes
@@ -482,6 +490,9 @@ CACHE_DIR = 1
 		beq	ok
 
 	errMount:
+		; [ /!\ TEMPORAIRE DEBUG
+		jmp	reboot
+		; ]
 		sec				; [2]
 		bcs	end			; [3]
 
@@ -605,6 +616,9 @@ CACHE_DIR = 1
 	errTrack:
 	errFormat:
 	; errMount:
+		; [ /!\ TEMPORAIRE DEBUG
+		jmp	reboot
+		; ]
 		sec				; [2]
 		bcs	end			; [3]
 .endproc
@@ -982,16 +996,16 @@ CACHE_DIR = 1
 
 		errOpen:
 			; lda	#error_mount		; [2]
-			lda	#error_open
+			lda	#error_open		; [2]
 			rts				; [6]
 
 		errRead:
-			lda	#error_readusb
-			rts
+			lda	#error_readusb		; [2]
+			rts				; [6]
 
 		errRdGo:
-			lda	#error_rdgo
-			rts
+			lda	#error_rdgo		; [2]
+			rts				; [6]
 
 		errFormat:
 			lda	#error_fmt		; [2]
@@ -1544,10 +1558,16 @@ CACHE_DIR = 1
 			rts				; [6]
 
 		error:
+		; [ /!\ TEMPORAIRE DEBUG
+		jmp	reboot
+		; ]
 			lda	#error_read		; [2]
 			sec				; [2]
 
 		end_error:
+		; [ /!\ TEMPORAIRE DEBUG
+		jmp	reboot
+		; ]
 			rts				; [6]
 	.endproc
 
@@ -1997,6 +2017,13 @@ CACHE_DIR = 1
 		cmp	#'/'			; [2]
 		beq	opendir			; [2/3]
 
+		; Conversion minuscules/MAJUSCULES
+		cmp	#'a'			; [2]
+		bcc	ZZ0007			; [2/3]
+		cmp	#'z'+1			; [2]
+		bcs	ZZ0007			; [2/3]
+		sbc	#'a'-'A'-1		; [2]
+
 	ZZ0007:
 		sta	CH376_DATA		; [4]
 		iny				; [2]
@@ -2043,4 +2070,38 @@ CACHE_DIR = 1
 	error:
 		sec
 		rts
+.endproc
+
+
+;----------------------------------------------------------------------
+;
+; Entrée:
+;	-
+;
+; Sortie:
+;	-
+;
+; Variables:
+;	Modifiées:
+;		-
+;	Utilisées:
+;		-
+; Sous-routines:
+;	-
+;----------------------------------------------------------------------
+.proc reboot
+		ldy	#$0b
+	loop:
+		lda	_reboot,y
+		sta	$bfe0,y
+		dey
+		bpl	loop
+		jmp	$bfe0
+
+	_reboot:
+		sei
+		lda	#$07
+		sta	VIA2::PRA
+		sta	VIA2::DDRA
+		jmp	($fffc)
 .endproc
