@@ -225,12 +225,20 @@ CACHE_DIR = 1
 .popseg
 
 ;----------------------------------------------------------------------
+;			Entry table
+;----------------------------------------------------------------------
+.pushseg
+	.segment "ENTRY_TBL"
+		jmp	dispatch_sedoric
+		jmp	dispatch_ftdos
+		jmp	set_dskname
+
+.popseg
+
+;----------------------------------------------------------------------
 ;			Programme principal
 ;----------------------------------------------------------------------
 .segment "CODE"
-	jmp	dispatch_sedoric
-	jmp	dispatch_ftdos
-	jmp	set_dskname
 
 .if 0
 	;----------------------------------------------------------------------

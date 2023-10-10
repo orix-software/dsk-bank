@@ -83,7 +83,7 @@ mrproper: clean
 #
 
 
-SRC = $(wildcard *.s)
+SRC = $(sort $(wildcard *.s))
 OBJS= $(addprefix $(OBJ_PATH)/, $(patsubst %.s,%.o, $(SRC)))
 
 DEPS := $(OBJS:.o=.d)
@@ -96,7 +96,7 @@ $(OBJ_PATH)/%.o: %.s
 
 $(BIN_PATH)/$(PROJECT): $(OBJS) $(LIBS)
 	@echo "Create $(PROJECT)"
-	@$(LD) $(LDFLAGS) -o $@ $^ $(LIBS)
+	$(LD) $(LDFLAGS) -o $@ $^ $(LIBS)
 ifeq ($(DEBUG),yes)
 	@echo "Create $(PROJECT).sym"
 	@sed -re 's/al 00(.{4}) \.(.+)$$/\1 \2/' $(BIN_PATH)/$(PROJECT).ca.sym | sort | uniq > $(BIN_PATH)/$(PROJECT).sym
