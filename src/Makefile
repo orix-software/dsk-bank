@@ -2,10 +2,10 @@
 # Spécifique au Projet
 #
 
-PROJECT ?= redis
+PROJECT ?= dsk-bank
 BUILD_PATH = ../build
 OBJ_PATH = $(BUILD_PATH)/obj
-BIN_PATH = $(BUILD_PATH)/bin
+BIN_PATH = $(BUILD_PATH)/usr/lib
 LIB_PATH = $(BUILD_PATH)/lib
 LD65_CFG = ../cfg/ram.cfg
 
